@@ -179,7 +179,7 @@ func TestRequestRoundTrip(t *testing.T) {
 	if request["method"] != "list_security_k_lines" {
 		t.Fatalf("请求方法不符: %v", request["method"])
 	}
-	// Request 是原始入口（对应 Python _Client._request），params 不做字段规范化；
+	// Request 是原始入口，params 不做字段规范化；
 	// 规范化由各 API 包装层负责。
 	params := request["params"].(map[string]any)
 	if params["security"] != "USHA000001" || params["start"] != int64(-1) {

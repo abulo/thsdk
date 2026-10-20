@@ -114,7 +114,7 @@ func TestIdentityRows(t *testing.T) {
 	if _, exists := first["security"]; exists {
 		t.Fatal("security 嵌套应被移除")
 	}
-	// 与 Python 一致：没有嵌套 security 的行不补 full_code。
+	// 没有嵌套 security 的行不补 full_code。
 	if _, exists := rows[1]["full_code"]; exists {
 		t.Fatalf("无嵌套 security 的行不应补 full_code: %v", rows[1])
 	}
@@ -162,7 +162,7 @@ func TestDataframeResultEnvelope(t *testing.T) {
 		},
 		"total": int64(1),
 	}
-	table, err := dataframeResult("list_market_securities", result)
+	table, err := tabularResult("list_market_securities", result)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestDataframeResultEnvelope(t *testing.T) {
 }
 
 func TestDataframeResultList(t *testing.T) {
-	table, err := dataframeResult("list_security_k_lines", []any{
+	table, err := tabularResult("list_security_k_lines", []any{
 		map[string]any{"time": "20240102", "close": 10.0},
 	})
 	if err != nil {

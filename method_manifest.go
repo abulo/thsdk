@@ -1,18 +1,15 @@
 package thsdk
 
-// 本文件对应 Python 包的 thsdk/_method_manifest.py。
-//
-// 完整登记 80 项同步 Canonical API 的稳定元数据：请求字段、必填字段、
-// 结果类型、DataFrame 主集合字段等，并在 init() 中执行与 Python 侧完全
-// 一致的完整性校验（80 项唯一、63 个只读 DataFrame 方法、契约一致等）。
+// 本文件登记 80 项同步 Canonical API 的稳定元数据：请求字段、必填字段、
+// 结果类型、表格主集合字段等，并在 init() 中执行模块加载时的完整性校验
+// （80 项唯一、63 个只读表格方法、契约一致等）。
 
 import (
 	"sort"
 	"strings"
 )
 
-// RequestKind 描述一个 Canonical 方法的请求形态，
-// 对应 Python 的 RequestKind = Literal["none", "object", "string", "securities"]。
+// RequestKind 描述一个 Canonical 方法的请求形态。
 type RequestKind int
 
 const (
@@ -22,29 +19,28 @@ const (
 	RequestKindSecurities                    // 证券序列参数
 )
 
-// NativeMethodSpec 描述一个可调用 Canonical 方法的稳定元数据，
-// 对应 Python 的 NativeMethodSpec dataclass。
+// NativeMethodSpec 描述一个可调用 Canonical 方法的稳定元数据。
 type NativeMethodSpec struct {
-	Name               string
-	GoName             string
-	Category           string
-	RequestKind        RequestKind
-	RequestType        string
-	ResultType         string
-	Mutating           bool
-	RequestFields      []string
-	RequiredFields     []string
-	ReturnsDataFrame   bool
-	DataFrameRowsField string
+	Name             string
+	GoName           string
+	Category         string
+	RequestKind      RequestKind
+	RequestType      string
+	ResultType       string
+	Mutating         bool
+	RequestFields    []string
+	RequiredFields   []string
+	ReturnsTabular   bool
+	TabularRowsField string
 }
 
-// requestContract 对应 Python _REQUEST_CONTRACTS 中的 (全部字段, 必填字段)。
+// requestContract 是 _REQUEST_CONTRACTS 请求契约中的单条记录（全部字段 + 必填字段）。
 type requestContract struct {
 	fields   []string
 	required []string
 }
 
-// requestContracts 是 Python _REQUEST_CONTRACTS 的逐字转写。
+// requestContracts 是全部请求契约的静态表，与原生侧逐字一致。
 var requestContracts = map[string]requestContract{
 	"account_permissions":                             {fields: []string{}, required: []string{}},
 	"add_account_watchlist_group_securities":          {fields: []string{"group_id", "securities"}, required: []string{"group_id", "securities"}},
@@ -128,9 +124,9 @@ var requestContracts = map[string]requestContract{
 	"sort_securities_by_industry":                     {fields: []string{"securities", "sort_begin", "sort_count", "sort_order"}, required: []string{"securities"}},
 }
 
-// dataframeRowsByResultType 对应 Python _DATAFRAME_ROWS_BY_RESULT_TYPE：
+// tabularRowsByResultType
 // 包装结果类型中的主记录集合字段。原生直接返回 list[T] 的方法不需要在此声明。
-var dataframeRowsByResultType = map[string]string{
+var tabularRowsByResultType = map[string]string{
 	"AccountWatchlistGroups":          "groups",
 	"AccountWatchlistSnapshot":        "securities",
 	"CommodityStockLinkageNewsResult": "items",
@@ -159,28 +155,28 @@ var dataframeRowsByResultType = map[string]string{
 
 func newSpec(name, goName, category string, kind RequestKind, requestType, resultType string, mutating bool) NativeMethodSpec {
 	contract := requestContracts[name]
-	rowsField := dataframeRowsByResultType[resultType]
+	rowsField := tabularRowsByResultType[resultType]
 	spec := NativeMethodSpec{
-		Name:               name,
-		GoName:             goName,
-		Category:           category,
-		RequestKind:        kind,
-		RequestType:        requestType,
-		ResultType:         resultType,
-		Mutating:           mutating,
-		RequestFields:      contract.fields,
-		RequiredFields:     contract.required,
-		DataFrameRowsField: rowsField,
+		Name:             name,
+		GoName:           goName,
+		Category:         category,
+		RequestKind:      kind,
+		RequestType:      requestType,
+		ResultType:       resultType,
+		Mutating:         mutating,
+		RequestFields:    contract.fields,
+		RequiredFields:   contract.required,
+		TabularRowsField: rowsField,
 	}
-	// 对应 Python：写操作不参与 DataFrame 包装。
+	// 写操作不参与表格包装。
 	if mutating {
-		spec.DataFrameRowsField = ""
+		spec.TabularRowsField = ""
 	}
-	spec.ReturnsDataFrame = !mutating && (len(resultType) >= 5 && resultType[:5] == "list[" || rowsField != "")
+	spec.ReturnsTabular = !mutating && (len(resultType) >= 5 && resultType[:5] == "list[" || rowsField != "")
 	return spec
 }
 
-// nativeMethodSpecs 对应 Python _SPECS，共 80 项。
+// nativeMethodSpecs _SPECS，共 80 项。
 var nativeMethodSpecs = []NativeMethodSpec{
 	newSpec("account_permissions", "AccountPermissions", "account", RequestKindNone, "", "AccountPermissions", false),
 	newSpec("add_account_watchlist_group_securities", "AddAccountWatchlistGroupSecurities", "account", RequestKindObject, "AccountWatchlistGroupSecuritiesRequest", "AccountWatchlistGroups", true),
@@ -273,8 +269,7 @@ var nativeMethods = func() map[string]NativeMethodSpec {
 	return result
 }()
 
-// nativeMethodNames 是所有 Canonical 方法名的字典序排列，
-// 对应 Python sorted(NATIVE_METHOD_NAMES)。
+// nativeMethodNames 是所有 Canonical 方法名的字典序排列。
 var nativeMethodNames = func() []string {
 	names := make([]string, 0, len(nativeMethodSpecs))
 	for _, spec := range nativeMethodSpecs {
@@ -295,18 +290,20 @@ var mutatingMethodNames = func() map[string]bool {
 	return result
 }()
 
-// dataframeMethodNames 是全部只读 DataFrame 方法名集合（共 63 个）。
-var dataframeMethodNames = func() map[string]bool {
+// tabularMethodNames 是全部只读表格方法名集合（共 63 个）。
+var tabularMethodNames = func() map[string]bool {
 	result := make(map[string]bool)
 	for _, spec := range nativeMethodSpecs {
-		if spec.ReturnsDataFrame {
+		if spec.ReturnsTabular {
 			result[spec.Name] = true
 		}
 	}
 	return result
 }()
 
-// init 复刻 Python 模块加载时的全部一致性断言，任何一条不满足即拒绝启动。
+// init 复刻 模块加载时的全部一致性断言，任何一条不满足即拒绝启动。
+// init 复刻 模块加载时的全部一致性断言，任何一条不满足即拒绝启动。
+// 入参：无。
 func init() {
 	if len(nativeMethods) != 80 {
 		panic("THSDK native method manifest must contain exactly 80 unique methods")
@@ -334,22 +331,22 @@ func init() {
 		}
 	}
 	for _, spec := range nativeMethodSpecs {
-		if len(spec.Name) >= 5 && spec.Name[:5] == "list_" && !spec.ReturnsDataFrame {
-			panic("THSDK DataFrame contracts do not match method semantics")
+		if len(spec.Name) >= 5 && spec.Name[:5] == "list_" && !spec.ReturnsTabular {
+			panic("THSDK 表格契约与方法语义不符")
 		}
-		if spec.Mutating && spec.ReturnsDataFrame {
-			panic("THSDK DataFrame contracts do not match method semantics")
+		if spec.Mutating && spec.ReturnsTabular {
+			panic("THSDK 表格契约与方法语义不符")
 		}
-		if spec.DataFrameRowsField != "" && !spec.ReturnsDataFrame {
-			panic("THSDK DataFrame contracts do not match method semantics")
+		if spec.TabularRowsField != "" && !spec.ReturnsTabular {
+			panic("THSDK 表格契约与方法语义不符")
 		}
 	}
-	if len(dataframeMethodNames) != 63 {
-		panic("THSDK must expose exactly 63 read-only DataFrame methods")
+	if len(tabularMethodNames) != 63 {
+		panic("THSDK 必须恰好暴露 63 个只读表格方法")
 	}
-	for name := range dataframeMethodNames {
+	for name := range tabularMethodNames {
 		if mutatingMethodNames[name] {
-			panic("THSDK must expose exactly 63 read-only DataFrame methods")
+			panic("THSDK 必须恰好暴露 63 个只读表格方法")
 		}
 	}
 	// subscription、Level-2、query_data 方法不得进入清单。
@@ -363,8 +360,7 @@ func init() {
 	}
 }
 
-// MethodInventory 返回完整的 80 项同步 Canonical API 清单，
-// 对应 Python 的 method_inventory()。
+// MethodInventory 返回完整的 80 项同步 Canonical API 清单。
 func MethodInventory() []NativeMethodSpec {
 	result := make([]NativeMethodSpec, len(nativeMethodSpecs))
 	copy(result, nativeMethodSpecs)

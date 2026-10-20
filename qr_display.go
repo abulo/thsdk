@@ -1,6 +1,6 @@
 package thsdk
 
-// 本文件对应 Python 包的 thsdk/_qr_display.py。
+// 本文件实现二维码挑战的终端显示。
 //
 // 尽力而为地显示一次二维码挑战：下载 HTTPS PNG 图片、手工解码 PNG
 // （zlib 解压 + 滤镜还原 + 亮度计算）、采样二维码模块并渲染到终端。
@@ -22,14 +22,20 @@ import (
 
 const (
 	pngSignature     = "\x89PNG\r\n\x1a\n"
-	maxImageBytes    = 2 * 1024 * 1024 // _MAX_IMAGE_BYTES
-	maxImageSide     = 1024            // _MAX_IMAGE_SIDE
-	maxRenderSeconds = 5.0             // _MAX_RENDER_SECONDS
-	quietZone        = 4               // _QUIET_ZONE
+	maxImageBytes    = 2 * 1024 * 1024 // 下载图片体积上限（2 MiB）
+	maxImageSide     = 1024            // 图片边长上限（1024 像素）
+	maxRenderSeconds = 5.0             // 渲染超时上限（5 秒）
+	quietZone        = 4               // 二维码静区宽度（4 模块）
 )
 
-// printQRChallenge 尽力显示一次二维码挑战，对应 Python print_qr_challenge。
+// printQRChallenge 尽力显示一次二维码挑战。
 // stream 为空时写入标准输出。
+// printQRChallenge 尽力显示一次二维码挑战。
+// stream 为空时写入标准输出。
+// 入参：
+//   - challenge：入参说明见函数用途。
+//   - renderTimeout：入参说明见函数用途。
+//   - stream：入参说明见函数用途。
 func printQRChallenge(challenge map[string]any, renderTimeout float64, stream io.Writer) {
 	output := stream
 	if output == nil {
@@ -63,8 +69,8 @@ func printQRChallenge(challenge map[string]any, renderTimeout float64, stream io
 	flushStream(output)
 }
 
-// challengeString 取字典字段并转为字符串；缺失或 nil 返回空串，
-// 对应 Python str(value.get(key) or "")。
+// challengeString 取字典字段并转为字符串；缺失或 nil 返回空串。
+// str(value.get(key) or "")。
 func challengeString(value map[string]any, key string) string {
 	item := value[key]
 	if item == nil {
@@ -83,6 +89,8 @@ func writeLine(stream io.Writer, value, asciiFallback string) bool {
 	return false
 }
 
+// 入参：
+//   - stream：入参说明见函数用途。
 func flushStream(stream io.Writer) {
 	if flusher, ok := stream.(interface{ Flush() error }); ok {
 		_ = flusher.Flush()
@@ -93,8 +101,15 @@ func flushStream(stream io.Writer) {
 	}
 }
 
-// loadQRModules 带超时地加载二维码模块，对应 Python _load_qr_modules：
+// loadQRModules 带超时地加载二维码模块。
 // 即使服务器一直保持 socket 打开也不会无限阻塞。
+// loadQRModules 带超时地加载二维码模块。
+// 即使服务器一直保持 socket 打开也不会无限阻塞。
+// 入参：
+//   - imageURL：入参说明见函数用途。
+//   - timeout：入参说明见函数用途。
+//
+// 出参：[][]bool,error。
 func loadQRModules(imageURL string, timeout float64) ([][]bool, error) {
 	if timeout <= 0 {
 		return nil, fmt.Errorf("二维码渲染超时")
@@ -132,7 +147,12 @@ func loadQRModules(imageURL string, timeout float64) ([][]bool, error) {
 	}
 }
 
-// downloadPNG 下载二维码 PNG 图片，对应 Python _download_png。
+// downloadPNG 下载二维码 PNG 图片。
+// downloadPNG 下载二维码 PNG 图片。
+// 入参：
+//   - imageURL：入参说明见函数用途。
+//
+// 出参：[]byte,error。
 func downloadPNG(imageURL string) ([]byte, error) {
 	parsed, err := url.Parse(imageURL)
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
@@ -162,7 +182,12 @@ func downloadPNG(imageURL string) ([]byte, error) {
 	return data, nil
 }
 
-// qrModules 从解码像素中识别二维码模块，对应 Python _qr_modules。
+// qrModules 从解码像素中识别二维码模块。
+// qrModules 从解码像素中识别二维码模块。
+// 入参：
+//   - pixels：入参说明见函数用途。
+//
+// 出参：[][]bool,error。
 func qrModules(pixels [][]bool) ([][]bool, error) {
 	imageHeight := len(pixels)
 	imageWidth := len(pixels[0])
@@ -229,7 +254,12 @@ func qrModules(pixels [][]bool) ([][]bool, error) {
 	return best.matrix, nil
 }
 
-// decodePNG 解码 PNG 像素为黑白矩阵，对应 Python _decode_png。
+// decodePNG 解码 PNG 像素为黑白矩阵。
+// decodePNG 解码 PNG 像素为黑白矩阵。
+// 入参：
+//   - data：入参说明见函数用途。
+//
+// 出参：[][]bool,error。
 func decodePNG(data []byte) ([][]bool, error) {
 	if len(data) < len(pngSignature) || string(data[:len(pngSignature)]) != pngSignature {
 		return nil, fmt.Errorf("二维码图片不是 PNG")
@@ -347,7 +377,13 @@ chunksDone:
 	return rows, nil
 }
 
-// inflatePNG 解压 IDAT 数据并严格校验长度与尾部，对应 Python 的 zlib 解压段。
+// inflatePNG 解压 IDAT 数据并严格校验长度与尾部。
+// inflatePNG 解压 IDAT 数据并严格校验长度与尾部。
+// 入参：
+//   - compressed：入参说明见函数用途。
+//   - expectedSize：入参说明见函数用途。
+//
+// 出参：[]byte,error。
 func inflatePNG(compressed []byte, expectedSize int) ([]byte, error) {
 	reader := bytes.NewReader(compressed)
 	zlibReader, err := zlib.NewReader(reader)
@@ -369,7 +405,7 @@ func inflatePNG(compressed []byte, expectedSize int) ([]byte, error) {
 	return raw, nil
 }
 
-// paeth 对应 Python _paeth。
+// paeth
 func paeth(left, above, upperLeft int) int {
 	prediction := left + above - upperLeft
 	leftDistance := absoluteInt(prediction - left)
@@ -391,7 +427,7 @@ func absoluteInt(value int) int {
 	return value
 }
 
-// sampleModules 按模块尺寸采样，对应 Python _sample_modules。
+// sampleModules 按模块尺寸采样。
 func sampleModules(pixels [][]bool, left, top, size, scale int) [][]bool {
 	matrix := make([][]bool, 0, size)
 	threshold := float64(scale*scale) / 2
@@ -415,7 +451,7 @@ func sampleModules(pixels [][]bool, left, top, size, scale int) [][]bool {
 	return matrix
 }
 
-// finderScore 计算三个定位图案的匹配分数，对应 Python _finder_score。
+// finderScore 计算三个定位图案的匹配分数。
 func finderScore(matrix [][]bool) float64 {
 	size := len(matrix)
 	matches := 0
@@ -438,7 +474,7 @@ func finderScore(matrix [][]bool) float64 {
 	return float64(matches) / float64(total)
 }
 
-// writeTerminalQR 渲染终端二维码，对应 Python _write_terminal_qr。
+// writeTerminalQR 渲染终端二维码。
 func writeTerminalQR(matrix [][]bool, stream io.Writer) bool {
 	size := len(matrix)
 	whiteRow := make([]bool, size+quietZone*2)
@@ -485,7 +521,7 @@ func writeTerminalQR(matrix [][]bool, stream io.Writer) bool {
 	return true
 }
 
-// isTerminal 判断输出流是否为终端，对应 Python stream.isatty()。
+// isTerminal 判断输出流是否为终端。
 func isTerminal(stream io.Writer) bool {
 	file, ok := stream.(*os.File)
 	if !ok {

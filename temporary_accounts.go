@@ -1,20 +1,20 @@
 package thsdk
 
-// 本文件对应 Python 包的 thsdk/_temporary_accounts.py。
-// 打包的 52 个短期体验用临时账户。
+// 本文件登记 52 个打包的短期体验用临时账户（后缀、密码与 MAC），
+// 供未提供任何凭据时的 Auth 兜底认证使用。
 
 import "math/rand"
 
 const temporaryAccountPrefix = "thsguest_"
 
-// temporaryAccount 对应 Python _TEMPORARY_ACCOUNT_ITEMS 中的 (后缀, 密码, MAC)。
+// temporaryAccount 是单个临时账户的记录：后缀、密码与设备 MAC。
 type temporaryAccount struct {
 	Suffix   string
 	Password string
 	MAC      string
 }
 
-// temporaryAccountItems 是 Python _TEMPORARY_ACCOUNT_ITEMS 的逐字转写。
+// temporaryAccountItems 是全部临时账户的静态清单（与原生侧逐字一致）。
 var temporaryAccountItems = []temporaryAccount{
 	{"n35365t7", "29e9075556b7bcee6ecbc1e31e3d9bc6", "1a:6e:20:a4:6e:2d"},
 	{"bqjbsllb", "f56c6a37055c326a578560b08df566fd", "aa:d0:98:7b:b3:72"},
@@ -69,7 +69,10 @@ var temporaryAccountItems = []temporaryAccount{
 	{"nbvb4mm8", "a16ea5fd49e863f69541d86ecb435221", "86:50:8f:e1:29:2b"},
 	{"nhhlgmko", "3a89a06d44b55f39919306dad0ddc6c6", "0a:21:a1:57:e9:48"}}
 
-// acquireTemporaryAccount 随机返回一个打包的临时账户，对应 Python acquire_temporary_account。
+// acquireTemporaryAccount 随机返回一个打包的临时账户。
+// acquireTemporaryAccount 随机返回一个打包的临时账户。
+// 入参：无。
+// 出参：string,string,string。
 func acquireTemporaryAccount() (string, string, string) {
 	item := temporaryAccountItems[rand.Intn(len(temporaryAccountItems))]
 	return temporaryAccountPrefix + item.Suffix, item.Password, item.MAC

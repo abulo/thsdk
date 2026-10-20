@@ -1,14 +1,14 @@
 package thsdk
 
-// 本文件对应 Python 包的 thsdk/constants.py。
+// 本文件集中定义协议层全部枚举常量（整数枚举与字符串枚举）。
 //
-// Python 的 IntEnum / str Enum 在 Go 中表示为带类型的常量：
-//   - Adjust / Period / InfoType 等整数枚举 → 整型常量；
-//   - CallAuctionPhase / NewsTraversalMode 等字符串枚举 → 字符串常量。
+// Go 中枚举以带类型的常量表达，分为两类：
+//   - 整数枚举（Adjust / Period / InfoType 等）→ 整型常量；
+//   - 字符串枚举（CallAuctionPhase / NewsTraversalMode 等）→ 字符串常量。
 //
-// 所有常量值与 Python 侧完全一致，可直接作为请求字段传入。
+// 所有常量值与原生协议逐字一致，可直接作为请求字段传入，不可改动。
 
-// Adjust 复权方式（对应 Python Adjust(IntEnum)）。
+// Adjust 复权方式。
 type Adjust int
 
 const (
@@ -17,7 +17,7 @@ const (
 	AdjustBackward Adjust = 2 // 后复权
 )
 
-// Period K 线周期（对应 Python Period(IntEnum)）。
+// Period K 线周期。
 type Period int
 
 const (
@@ -34,7 +34,7 @@ const (
 	PeriodYear      Period = 0x7001 // 年线
 )
 
-// CallAuctionPhase 集合竞价阶段（对应 Python CallAuctionPhase(str, Enum)）。
+// CallAuctionPhase 集合竞价阶段。
 type CallAuctionPhase string
 
 const (
@@ -43,7 +43,7 @@ const (
 	CallAuctionPhaseCustom  CallAuctionPhase = "custom"
 )
 
-// IndexCallAuctionPhase 指数集合竞价阶段（对应 Python IndexCallAuctionPhase(str, Enum)）。
+// IndexCallAuctionPhase 指数集合竞价阶段。
 type IndexCallAuctionPhase string
 
 const (
@@ -51,7 +51,7 @@ const (
 	IndexCallAuctionPhaseClosing IndexCallAuctionPhase = "closing"
 )
 
-// ExtendedHoursSession 盘前盘后时段（对应 Python ExtendedHoursSession(str, Enum)）。
+// ExtendedHoursSession 盘前盘后时段。
 type ExtendedHoursSession string
 
 const (
@@ -59,14 +59,14 @@ const (
 	ExtendedHoursSessionPostMarket ExtendedHoursSession = "post_market"
 )
 
-// OrderBookDepth 盘口档位（对应 Python OrderBookDepth(str, Enum)）。
+// OrderBookDepth 盘口档位。
 type OrderBookDepth string
 
 const (
 	OrderBookDepthFive OrderBookDepth = "5"
 )
 
-// NewsFlashTraversalMode 快讯遍历模式（对应 Python NewsFlashTraversalMode(str, Enum)）。
+// NewsFlashTraversalMode 快讯遍历模式。
 type NewsFlashTraversalMode string
 
 const (
@@ -75,7 +75,7 @@ const (
 	NewsFlashTraversalModeNewer NewsFlashTraversalMode = "newer"
 )
 
-// NewsTimeline 资讯时间线（对应 Python NewsTimeline(str, Enum)）。
+// NewsTimeline 资讯时间线。
 type NewsTimeline string
 
 const (
@@ -83,7 +83,7 @@ const (
 	NewsTimelineRealtime   NewsTimeline = "realtime"
 )
 
-// NewsTraversalMode 资讯遍历模式（对应 Python NewsTraversalMode(str, Enum)）。
+// NewsTraversalMode 资讯遍历模式。
 type NewsTraversalMode string
 
 const (
@@ -91,7 +91,7 @@ const (
 	NewsTraversalModeSince NewsTraversalMode = "since"
 )
 
-// NewsDirection 资讯方向（对应 Python NewsDirection(str, Enum)）。
+// NewsDirection 资讯方向。
 type NewsDirection string
 
 const (
@@ -100,7 +100,7 @@ const (
 	NewsDirectionNewer NewsDirection = "newer"
 )
 
-// InfoType 资讯类型（对应 Python InfoType(IntEnum)）。
+// InfoType 资讯类型。
 type InfoType int
 
 const (
@@ -138,7 +138,7 @@ const (
 	InfoTypeHkPanInfo              InfoType = 32771
 )
 
-// InfoSummaryMode 资讯摘要模式（对应 Python InfoSummaryMode(IntEnum)）。
+// InfoSummaryMode 资讯摘要模式。
 type InfoSummaryMode int
 
 const (
@@ -147,7 +147,7 @@ const (
 	InfoSummaryModeEnabled  InfoSummaryMode = 2
 )
 
-// RealtimeStatsMetric 实时统计指标（对应 Python RealtimeStatsMetric(IntEnum)）。
+// RealtimeStatsMetric 实时统计指标。
 type RealtimeStatsMetric int
 
 const (
@@ -157,7 +157,7 @@ const (
 	RealtimeStatsMetricLimitUpState     RealtimeStatsMetric = 330329
 )
 
-// RealtimeSecuritySignal 实时证券信号（对应 Python RealtimeSecuritySignal(str, Enum)）。
+// RealtimeSecuritySignal 实时证券信号。
 type RealtimeSecuritySignal string
 
 const (
@@ -167,7 +167,7 @@ const (
 	RealtimeSecuritySignalLimitDownBreak RealtimeSecuritySignal = "limit_down_break"
 )
 
-// FinancialSnapshotField 财务快照字段（对应 Python FinancialSnapshotField(str, Enum)）。
+// FinancialSnapshotField 财务快照字段。
 type FinancialSnapshotField string
 
 const (
@@ -176,7 +176,7 @@ const (
 	FinancialSnapshotFieldNetAssetPerShare FinancialSnapshotField = "net_asset_per_share"
 )
 
-// OptionGreeksMetric 期权 Greeks 指标（对应 Python OptionGreeksMetric(IntEnum)）。
+// OptionGreeksMetric 期权 Greeks 指标。
 type OptionGreeksMetric int
 
 const (
@@ -191,7 +191,7 @@ const (
 	OptionGreeksMetricVega              OptionGreeksMetric = 723858
 )
 
-// WencaiHotBlockKind 问财热门板块类型（对应 Python WencaiHotBlockKind(str, Enum)）。
+// WencaiHotBlockKind 问财热门板块类型。
 type WencaiHotBlockKind string
 
 const (
@@ -199,7 +199,7 @@ const (
 	WencaiHotBlockKindIndustry WencaiHotBlockKind = "industry"
 )
 
-// HotEventNewsRange 热点事件资讯范围（对应 Python HotEventNewsRange(str, Enum)）。
+// HotEventNewsRange 热点事件资讯范围。
 type HotEventNewsRange string
 
 const (
@@ -207,7 +207,7 @@ const (
 	HotEventNewsRangeHistorical HotEventNewsRange = "historical"
 )
 
-// ShortTermEventMode 短线事件模式（对应 Python ShortTermEventMode(str, Enum)）。
+// ShortTermEventMode 短线事件模式。
 type ShortTermEventMode string
 
 const (
@@ -215,7 +215,7 @@ const (
 	ShortTermEventModeSecurityScoped ShortTermEventMode = "security_scoped"
 )
 
-// PerformanceContributionTarget 业绩贡献目标（对应 Python PerformanceContributionTarget(str, Enum)）。
+// PerformanceContributionTarget 业绩贡献目标。
 type PerformanceContributionTarget string
 
 const (
@@ -223,7 +223,7 @@ const (
 	PerformanceContributionTargetSecurity PerformanceContributionTarget = "security"
 )
 
-// PopularityRankTopType 人气榜类型（对应 Python PopularityRankTopType(IntEnum)）。
+// PopularityRankTopType 人气榜类型。
 type PopularityRankTopType int
 
 const (

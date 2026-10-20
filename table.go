@@ -1,13 +1,14 @@
 package thsdk
 
-// 本文件实现 pandas.DataFrame 的 Go 等价类型 *Table，并移植 api.py 中
-// _frame / _records_frame / _identity_rows / _dataframe_result 的全部逻辑。
+// 本文件实现表格结果类型 *Table：把公开层的记录/行数据包装为
+// 带列名、行记录、索引与元数据的表格结构。
 //
-// Table 与 DataFrame 的对应关系：
-//   - Columns ↔ DataFrame.columns（有序列名）
-//   - Rows    ↔ 行记录（[]map[string]any，缺失列值为 nil，对应 NaN）
-//   - Index   ↔ DataFrame.index（set_index 后生效）
-//   - Attrs   ↔ DataFrame.attrs（thsdk 元数据等）
+// Table 的字段设计：
+//   - Columns：有序列名列表；
+//   - Rows：行记录（[]map[string]any，缺失列值为 nil）；
+//   - Index：索引值（按列设置索引后生效）；
+//   - IndexName：索引列名；
+//   - Attrs：附加元数据。
 
 import (
 	"encoding/json"
@@ -18,7 +19,7 @@ import (
 	"time"
 )
 
-// Table 是 pandas.DataFrame 的等价实现，用于承载公开层表格结果。
+// Table 是公开层表格结果类型，承载带列名与索引的行数据。
 type Table struct {
 	Columns   []string
 	Rows      []map[string]any
@@ -27,7 +28,7 @@ type Table struct {
 	Attrs     map[string]any
 }
 
-// eightDigits 对应 _frame 中的 ^\d{8}$ 全匹配判断。
+// eightDigits 匹配 ^\d{8}$ 的八位纯数字字符串（用于日期类字段判断）。
 var eightDigits = regexp.MustCompile(`^\d{8}$`)
 
 // NewTable 创建空表格。
@@ -70,6 +71,10 @@ func (t *Table) HasColumn(name string) bool {
 }
 
 // SetAttr 设置 attrs 元数据。
+// SetAttr 设置 attrs 元数据。
+// 入参：
+//   - key：入参说明见函数用途。
+//   - value：入参说明见函数用途。
 func (t *Table) SetAttr(key string, value any) {
 	if t.Attrs == nil {
 		t.Attrs = map[string]any{}
@@ -86,6 +91,9 @@ func (t *Table) Attr(key string) any {
 }
 
 // JSON 把表格序列化为 {"columns","rows","index","index_name","attrs"}。
+// JSON 把表格序列化为 {"columns","rows","index","index_name","attrs"}。
+// 入参：无。
+// 出参：[]byte,error。
 func (t *Table) JSON() ([]byte, error) {
 	return marshalTable(t)
 }
@@ -99,10 +107,10 @@ func (t *Table) String() string {
 	return string(data)
 }
 
-// newTableFromRecords 从记录集合构造表格，对应 pandas.DataFrame.from_records：
+// newTableFromRecords 从记录集合构造表格，对应 记录集合：
 // 列顺序为各记录键首次出现的顺序，缺失键值为 nil。
 //
-// Go 的 map 迭代顺序是随机的（Python dict 保持插入序），因此单个记录内的
+// Go 的 map 迭代顺序是随机的（map 保持插入序），因此单个记录内的
 // 键先按字典序排序，使列顺序确定且可复现；跨记录仍保持首次出现语义。
 func newTableFromRecords(records []map[string]any) *Table {
 	var columns []string
@@ -143,7 +151,7 @@ type keyEntry struct {
 	value any
 }
 
-// sortedMappingEntries 对应 _records_frame 中的排序逻辑：
+// sortedMappingEntries 对应记录集合转换 中的排序逻辑：
 // 优先按整数键升序，其余按字符串键；可选 mapping_order 优先置顶。
 func sortedMappingEntries(mapping map[string]any, mappingOrder any) []keyEntry {
 	entries := make([]keyEntry, 0, len(mapping))
@@ -171,6 +179,8 @@ func sortedMappingEntries(mapping map[string]any, mappingOrder any) []keyEntry {
 	return append(ordered, remaining...)
 }
 
+// 入参：
+//   - entries：入参说明见函数用途。
 func sortEntries(entries []keyEntry) {
 	sort.SliceStable(entries, func(i, j int) bool {
 		leftRank, leftKey := mappingSortKey(entries[i].key)
@@ -182,7 +192,12 @@ func sortEntries(entries []keyEntry) {
 	})
 }
 
-// mappingSortKey 对应 Python mapping_sort_key：整数键排前，字符串键排后。
+// mappingSortKey 对应排序键规则：整数键排前，字符串键排后。
+// mappingSortKey 对应排序键规则：整数键排前，字符串键排后。
+// 入参：
+//   - key：入参说明见函数用途。
+//
+// 出参：int,string。
 func mappingSortKey(key any) (int, string) {
 	if value, ok := asInt64(key); ok {
 		return 0, fmt.Sprintf("%020d", value)
@@ -190,8 +205,16 @@ func mappingSortKey(key any) (int, string) {
 	return 1, fmt.Sprint(key)
 }
 
-// recordsFrame 对应 Python _records_frame：把明确的记录集合转换为表格，
+// recordsFrame 对应记录集合转换：把明确的记录集合转换为表格。
 // 不展开行内嵌套值。
+// recordsFrame 对应记录集合转换：把明确的记录集合转换为表格。
+// 不展开行内嵌套值。
+// 入参：
+//   - rows：入参说明见函数用途。
+//   - mappingKeys：入参说明见函数用途。
+//   - mappingOrder：入参说明见函数用途。
+//
+// 出参：*Table,error。
 func recordsFrame(rows any, mappingKeys bool, mappingOrder any) (*Table, error) {
 	switch value := rows.(type) {
 	case nil:
@@ -243,7 +266,13 @@ func recordsFrame(rows any, mappingKeys bool, mappingOrder any) (*Table, error) 
 	return newTableFromRecords([]map[string]any{{"value": values}}), nil
 }
 
-// frame 对应 Python _frame：可选把 time 列转为日期索引。
+// frame 对应表格框架：可选把 time 列转为日期索引。
+// frame 对应表格框架：可选把 time 列转为日期索引。
+// 入参：
+//   - rows：入参说明见函数用途。
+//   - timeIndex：入参说明见函数用途。
+//
+// 出参：*Table,error。
 func frame(rows any, timeIndex bool) (*Table, error) {
 	var table *Table
 	if existing, ok := rows.(*Table); ok {
@@ -279,7 +308,7 @@ func frame(rows any, timeIndex bool) (*Table, error) {
 	return table, nil
 }
 
-// clone 深拷贝表格（对应 pandas DataFrame.copy(deep=True)）。
+// clone 深拷贝表格（与表格深拷贝语义一致）。
 func (t *Table) clone() *Table {
 	copied := &Table{
 		Columns:   append([]string(nil), t.Columns...),
@@ -297,7 +326,10 @@ func (t *Table) clone() *Table {
 	return copied
 }
 
-// SetIndex 把指定列设为索引并从数据列中移除，对应 pandas set_index。
+// SetIndex 把指定列设为索引并从数据列中移除，对应 按列设置索引。
+// SetIndex 把指定列设为索引并从数据列中移除，对应 按列设置索引。
+// 入参：
+//   - name：入参说明见函数用途。
 func (t *Table) SetIndex(name string) {
 	index := make([]any, len(t.Rows))
 	for i, row := range t.Rows {
@@ -317,7 +349,12 @@ func (t *Table) SetIndex(name string) {
 	}
 }
 
-// Select 按字段名选取列，对应 Python get_price 中的 fields 过滤。
+// Select 按字段名选取列，对应 get_price 中的 fields 过滤。
+// Select 按字段名选取列，对应 get_price 中的 fields 过滤。
+// 入参：
+//   - fields：入参说明见函数用途。
+//
+// 出参：*Table,error。
 func (t *Table) Select(fields []string) (*Table, error) {
 	selected := make([]string, len(fields))
 	for i, field := range fields {
@@ -349,7 +386,7 @@ func (t *Table) Select(fields []string) (*Table, error) {
 	return table, nil
 }
 
-// identityRows 对应 Python _identity_rows：把行内嵌套的 security 展平为
+// identityRows 对应行内展平：把行内嵌套的 security 展平为
 // code / market / full_code 列（仅当这些列尚未存在时补充）。
 func identityRows(rows any) []map[string]any {
 	values, ok := toSequenceAny(rows)
@@ -399,14 +436,21 @@ func mapString(mapping map[string]any, key string) string {
 	return fmt.Sprint(value)
 }
 
-// dataframeResult 按 manifest 中的稳定主集合字段构造公开表格结果，
-// 对应 Python _dataframe_result。
-func dataframeResult(method string, result any) (*Table, error) {
+// tabularResult 按 manifest 中的稳定主集合字段构造公开表格结果。
+// 对应表格结果构造。
+// tabularResult 按 manifest 中的稳定主集合字段构造公开表格结果。
+// 对应表格结果构造。
+// 入参：
+//   - method：入参说明见函数用途。
+//   - result：入参说明见函数用途。
+//
+// 出参：*Table,error。
+func tabularResult(method string, result any) (*Table, error) {
 	spec, ok := nativeMethods[method]
 	if !ok {
 		return nil, newTHSDKError("未知的 Canonical 方法: %s", method)
 	}
-	rowField := spec.DataFrameRowsField
+	rowField := spec.TabularRowsField
 	var rows any
 	metadata := map[string]any{}
 	if rowField == "" {
@@ -447,6 +491,11 @@ func dataframeResult(method string, result any) (*Table, error) {
 }
 
 // marshalTable 序列化表格的完整状态。
+// marshalTable 序列化表格的完整状态。
+// 入参：
+//   - t：入参说明见函数用途。
+//
+// 出参：[]byte,error。
 func marshalTable(t *Table) ([]byte, error) {
 	if t == nil {
 		t = NewTable()
@@ -461,6 +510,11 @@ func marshalTable(t *Table) ([]byte, error) {
 }
 
 // toSequenceAny 把任意切片值转为 []any。
+// toSequenceAny 把任意切片值转为 []any。
+// 入参：
+//   - value：入参说明见函数用途。
+//
+// 出参：[]any,bool。
 func toSequenceAny(value any) ([]any, bool) {
 	switch typed := value.(type) {
 	case []any:

@@ -25,15 +25,15 @@ func TestNativeMethodsUniqueness(t *testing.T) {
 	}
 }
 
-func TestDataFrameRowFieldsCount(t *testing.T) {
+func TestTabularRowFieldsCount(t *testing.T) {
 	count := 0
 	for _, spec := range nativeMethods {
-		if spec.ReturnsDataFrame {
+		if spec.ReturnsTabular {
 			count++
 		}
 	}
 	if count != 63 {
-		t.Fatalf("返回 DataFrame 的方法 = %d，期望 63", count)
+		t.Fatalf("返回表格形态的方法 = %d，期望 63", count)
 	}
 }
 
@@ -64,7 +64,7 @@ func TestRequestContracts(t *testing.T) {
 }
 
 func TestKnownResultTypes(t *testing.T) {
-	// 写操作或未知主集合字段的方法应能查到 dataframeRowsByResultType 之外
+	// 写操作或未知主集合字段的方法应能查到 tabularRowsByResultType 之外
 	// 的类型定义；至少确保 map 存在且无空 ResultType。
 	for name, spec := range nativeMethods {
 		if spec.ResultType == "" {
@@ -77,8 +77,8 @@ func TestKnownResultTypes(t *testing.T) {
 func TestGroupMethodsMapping(t *testing.T) {
 	// AccountWatchlistGroups 必须使用 groups 字段并在映射模式下返回。
 	for name, spec := range nativeMethods {
-		if name == "get_account_watchlist_groups" && spec.DataFrameRowsField != "groups" {
-			t.Fatalf("get_account_watchlist_groups 主集合字段 = %s，期望 groups", spec.DataFrameRowsField)
+		if name == "get_account_watchlist_groups" && spec.TabularRowsField != "groups" {
+			t.Fatalf("get_account_watchlist_groups 主集合字段 = %s，期望 groups", spec.TabularRowsField)
 		}
 	}
 }

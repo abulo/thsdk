@@ -25,7 +25,7 @@ func TestDateNumber(t *testing.T) {
 		{20240305, 20240305},
 		{"2024-03-05", 20240305},
 		{"20240305", 20240305},
-		// 与 Python 一致：仅做 8 位数字校验，不验证月/日合法性。
+		// 仅做 8 位数字校验，不验证月/日合法性。
 		{"2024-13-01", 20241301},
 	}
 	for _, item := range cases {
@@ -38,7 +38,7 @@ func TestDateNumber(t *testing.T) {
 	if err != nil || provided || number != 0 {
 		t.Fatalf("nil 应返回未提供: %d %v %v", number, provided, err)
 	}
-	// 与 Python 一致：含时间的字符串（带空格/冒号）不属于 8 位日期。
+	// 含时间的字符串（带空格/冒号）不属于 8 位日期。
 	for _, bad := range []any{"202401", 123, "abc", "2024-03-05 10:00:00"} {
 		if _, _, err := dateNumber(bad); err == nil {
 			t.Fatalf("非法日期 %v 应报错", bad)
@@ -148,7 +148,7 @@ func TestWencaiIdentity(t *testing.T) {
 	if identity["code"] != "000001" || identity["market"] != "SZ" || identity["full_code"] != "SZ000001" {
 		t.Fatalf("wencai 身份提取失败: %v", identity)
 	}
-	// full_code 以四位字母开头时拆分（对应 Python full_code[:4].isalpha()）。
+	// full_code 以四位字母开头时拆分（按前四位字母拆分）。
 	identity = wencaiIdentity(map[string]any{"full_code": "USHA000001"})
 	if identity["code"] != "000001" || identity["market"] != "USHA" {
 		t.Fatalf("full_code 拆分失败: %v", identity)

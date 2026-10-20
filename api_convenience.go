@@ -1,13 +1,13 @@
 package thsdk
 
-// 本文件对应 Python 包的 thsdk/api.py 中的便捷函数层：
+// 本文件实现公开便捷函数层：
 // get_price / klines / intraday_data / tick_level1 / depth / corporate_action /
 // search_symbols / complete_ths_code / wencai_nlp / news / market_securities /
 // block_constituents，以及公开认证入口 auth / auth_qrcode / logout。
 //
-// 设计说明：Python 关键字参数在 Go 中映射为「选项结构体」；零值表示
-// 未指定并采用与 Python 一致的默认值。所有表格结果返回 *Table
-// （pandas.DataFrame 的等价实现）。
+// 设计说明：关键字参数在 Go 中映射为「选项结构体」；零值表示
+// 未指定并采用默认值。所有表格结果返回 *Table
+// （列/行结构的表格结果）。
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// periods 对应 Python _PERIODS。
+// periods 是周期中文名 → 协议 Period 的映射表。
 var periods = map[string]int64{
 	"1m": 0x3001, "5m": 0x3005, "15m": 0x300F, "30m": 0x301E, "60m": 0x303C, "120m": 0x3078,
 	"day": 0x4000, "daily": 0x4000, "1d": 0x4000,
@@ -26,35 +26,40 @@ var periods = map[string]int64{
 	"year":    0x7001,
 }
 
-// adjustments 对应 Python _ADJUSTMENTS（不含 None 键，None 由调用方处理）。
+// adjustments 是复权中文名 → 协议 Adjust 的映射表（不含"不复权"）。
 var adjustments = map[string]int64{
 	"": 0, "none": 0, "pre": 1, "forward": 1, "post": 2, "backward": 2,
 }
 
-// Auth 按 显式凭据 → 环境变量 → 已有会话 → 临时账户 的顺序完成认证，
-// 对应 Python 公开层 thsdk.auth。
+// Auth 按 显式凭据 → 环境变量 → 已有会话 → 临时账户 的顺序完成认证。
+// 入参：username、password、mac、opts；语义见函数用途。
+// 出参：bool（成功时）；error 为调用失败时的错误。
 func Auth(username, password, mac string, opts ...*AuthOptions) (bool, error) {
 	return getClient().Auth(username, password, mac, opts...)
 }
 
-// AuthQRCode 优先恢复已有会话；需要时直接显示二维码并等待扫码，
-// 对应 Python 公开层 thsdk.auth_qrcode。
+// AuthQRCode 优先恢复已有会话；需要时直接显示二维码并等待扫码。
+// 入参：opts；语义见函数用途。
+// 出参：bool（成功时）；error 为调用失败时的错误。
 func AuthQRCode(opts ...*AuthQRCodeOptions) (bool, error) {
 	return getClient().AuthQRCode(opts...)
 }
 
-// Logout 退出当前账号并删除当前目录中可复用的会话文件，
-// 对应 Python 公开层 thsdk.logout。
+// Logout 退出当前账号并删除当前目录中可复用的会话文件。
+// 入参：；语义见函数用途。
+// 出参：error 为调用失败时的错误。
 func Logout() error {
 	return getClient().Logout()
 }
 
-// Request 在显式认证后执行一次包定义的数据请求，对应 Python thsdk._request。
+// Request 在显式认证后执行一次包定义的数据请求。
+// 入参：method、params、opts；语义见函数用途。
+// 出参：any（成功时）；error 为调用失败时的错误。
 func Request(method string, params any, opts ...*CallOptions) (any, error) {
 	return getClient().Request(method, params, opts...)
 }
 
-// security 对应 Python _security：完整代码字符串或 code/market 映射。
+// security 规范化证券输入（完整代码字符串或 code/market 映射）。
 func security(value any) (map[string]any, error) {
 	if mapping, ok := value.(map[string]any); ok {
 		code := strings.TrimSpace(fmt.Sprint(mapping["code"]))
@@ -71,7 +76,7 @@ func security(value any) (map[string]any, error) {
 	return normalizeSecurity(strings.TrimSpace(text))
 }
 
-// securities 对应 Python _securities：单个或序列证券输入统一为列表。
+// securities 把单个或序列证券输入统一为列表。
 func securities(value any) ([]any, error) {
 	if _, isString := value.(string); isString {
 		item, err := security(value)
@@ -102,7 +107,7 @@ func securities(value any) ([]any, error) {
 	return result, nil
 }
 
-// marketValue 对应 Python _market：四位字母市场代码校验。
+// marketValue 校验四位字母市场代码。
 func marketValue(value string) (string, error) {
 	market := strings.ToUpper(strings.TrimSpace(value))
 	if len(market) != 4 || !isAlpha(market) {
@@ -111,7 +116,7 @@ func marketValue(value string) (string, error) {
 	return market, nil
 }
 
-// marketsValue 对应 Python _markets：字符串或迭代市场输入，空结果返回 nil。
+// marketsValue 规范化市场输入（字符串或序列），空结果返回 nil。
 func marketsValue(value any) ([]string, error) {
 	var values []string
 	if text, isString := value.(string); isString {
@@ -141,7 +146,7 @@ func marketsValue(value any) ([]string, error) {
 	return result, nil
 }
 
-// dateNumber 对应 Python _date_number：返回 (数值, 是否提供, 错误)。
+// dateNumber 规范化日期为整数：返回 (数值, 是否提供, 错误)。
 func dateNumber(value any) (int64, bool, error) {
 	switch typed := value.(type) {
 	case nil:
@@ -174,7 +179,7 @@ func dateNumber(value any) (int64, bool, error) {
 	}
 }
 
-// dateText 对应 Python _date_text：未提供日期时返回 "0"。
+// dateText 规范化日期为文本，未提供时返回 "0"。
 func dateText(value any) string {
 	number, provided, err := dateNumber(value)
 	if err != nil || !provided {
@@ -183,7 +188,7 @@ func dateText(value any) string {
 	return strconv.FormatInt(number, 10)
 }
 
-// datetimeText 对应 Python _datetime_text：输出 ISO 8601，无时区按上海时区。
+// datetimeText 规范化日期时间为 ISO 8601 文本，无时区按上海时区。
 func datetimeText(value any) (string, error) {
 	var parsed time.Time
 	explicitZone := false
@@ -193,7 +198,7 @@ func datetimeText(value any) (string, error) {
 	default:
 		text := strings.TrimSpace(fmt.Sprint(value))
 		text = strings.ReplaceAll(text, "Z", "+00:00")
-		// Python fromisoformat：显式时区（±hh:mm）保持原偏移；无时区输入按上海时区。
+		// 解析 ISO 8601：显式时区（±hh:mm）保持原偏移；无时区输入按上海时区。
 		// 注意日期分隔符 "-" 不算时区，只检查时间部分之后的符号。
 		explicitZone = strings.Contains(text, "+")
 		if !explicitZone {
@@ -222,7 +227,7 @@ func parseISODateTime(text string) time.Time {
 	return time.Time{}
 }
 
-// assignShanghai 把无时区时间按墙钟时间套用上海时区（对应 replace(tzinfo=上海)）。
+// assignShanghai 把无时区时间按墙钟时间套用上海时区（不改变墙上时钟读数）。
 func assignShanghai(value time.Time) time.Time {
 	return time.Date(value.Year(), value.Month(), value.Day(),
 		value.Hour(), value.Minute(), value.Second(), value.Nanosecond(), shanghai)
@@ -240,7 +245,7 @@ func allDigits(text string) bool {
 	return true
 }
 
-// GetPriceOptions 对应 Python get_price 关键字参数。
+// GetPriceOptions 控制 GetPrice 的查询参数。
 type GetPriceOptions struct {
 	StartDate any      // 日期字符串 / time.Time / int（YYYYMMDD）；nil 表示不指定
 	EndDate   any      // 同上
@@ -250,7 +255,9 @@ type GetPriceOptions struct {
 	Count     int      // 0 表示不指定；与 StartDate/EndDate 互斥
 }
 
-// GetPrice 查询一只证券的 K 线并返回 *Table（对应 pandas.DataFrame）。
+// GetPrice 查询一只证券的 K 线并返回表格结果（*Table）。
+// 入参：securityValue、opts；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func GetPrice(securityValue any, opts ...*GetPriceOptions) (*Table, error) {
 	option := GetPriceOptions{}
 	for _, item := range opts {
@@ -335,7 +342,7 @@ func GetPrice(securityValue any, opts ...*GetPriceOptions) (*Table, error) {
 	return table, nil
 }
 
-// KlinesOptions 对应 Python klines 参数。
+// KlinesOptions 控制 Klines 的查询参数。
 type KlinesOptions struct {
 	StartTime any    // 日期字符串 / time.Time / int
 	EndTime   any    // 同上
@@ -345,6 +352,8 @@ type KlinesOptions struct {
 }
 
 // Klines 使用传统参数名查询 K 线；返回 *Table。
+// 入参：thsCode、opts；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func Klines(thsCode any, opts ...*KlinesOptions) (*Table, error) {
 	option := KlinesOptions{}
 	for _, item := range opts {
@@ -373,6 +382,8 @@ func Klines(thsCode any, opts ...*KlinesOptions) (*Table, error) {
 }
 
 // IntradayData 查询指定交易日的分时走势；date 为 nil 时查询当天。
+// 入参：thsCode、dateValue；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func IntradayData(thsCode any, dateValue any) (*Table, error) {
 	result, err := ListSecurityIntradayBars(map[string]any{
 		"security": thsCode,
@@ -384,7 +395,7 @@ func IntradayData(thsCode any, dateValue any) (*Table, error) {
 	return frame(result, false)
 }
 
-// TickLevel1Options 对应 Python tick_level1 参数。
+// TickLevel1Options 控制 TickLevel1 的查询参数。
 type TickLevel1Options struct {
 	Count     int // 默认 100；与时间范围互斥
 	StartTime any // 与 EndTime 同时提供
@@ -392,6 +403,8 @@ type TickLevel1Options struct {
 }
 
 // TickLevel1 查询普通逐笔成交，可按最近条数或明确时间范围读取。
+// 入参：thsCode、opts；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func TickLevel1(thsCode any, opts ...*TickLevel1Options) (*Table, error) {
 	option := TickLevel1Options{}
 	for _, item := range opts {
@@ -448,6 +461,8 @@ func TickLevel1(thsCode any, opts ...*TickLevel1Options) (*Table, error) {
 }
 
 // Depth 查询一只或多只证券的五档盘口，按买卖方向和档位展开为表格。
+// 入参：thsCode；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func Depth(thsCode any) (*Table, error) {
 	inputs, err := securities(thsCode)
 	if err != nil {
@@ -492,12 +507,14 @@ func Depth(thsCode any) (*Table, error) {
 	return frame(rows, false)
 }
 
-// CorporateActionOptions 对应 Python corporate_action 参数。
+// CorporateActionOptions 控制 CorporateAction 的查询参数。
 type CorporateActionOptions struct {
 	Count int // 默认 100
 }
 
 // CorporateAction 查询最近的分红、送转、配股和除权除息记录。
+// 入参：thsCode、opts；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func CorporateAction(thsCode any, opts ...*CorporateActionOptions) (*Table, error) {
 	count := 100
 	for _, item := range opts {
@@ -531,6 +548,8 @@ func CorporateAction(thsCode any, opts ...*CorporateActionOptions) (*Table, erro
 }
 
 // SearchSymbols 按代码、拼音或中文名称搜索证券。
+// 入参：pattern、market；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func SearchSymbols(pattern, market string) (*Table, error) {
 	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
@@ -552,6 +571,8 @@ func SearchSymbols(pattern, market string) (*Table, error) {
 }
 
 // CompleteTHSCode 把一个或多个短代码解析为可用于行情查询的完整证券代码。
+// 入参：thsCode；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func CompleteTHSCode(thsCode any) (*Table, error) {
 	var codes []string
 	if text, ok := thsCode.(string); ok {
@@ -578,13 +599,15 @@ func CompleteTHSCode(thsCode any) (*Table, error) {
 	return frame(identityRows(result), false)
 }
 
-// WencaiNLPOptions 对应 Python wencai_nlp 参数。
+// WencaiNLPOptions 控制 WencaiNLP 的查询参数。
 type WencaiNLPOptions struct {
 	Markets any // 字符串（逗号/空格分隔）或市场序列；nil 表示全部
 	Limit   int // 默认 100
 }
 
 // WencaiNLP 执行自然语言选股，并把可用动态字段展开为表格列。
+// 入参：condition、opts；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func WencaiNLP(condition string, opts ...*WencaiNLPOptions) (*Table, error) {
 	option := WencaiNLPOptions{}
 	for _, item := range opts {
@@ -624,13 +647,13 @@ func WencaiNLP(condition string, opts ...*WencaiNLPOptions) (*Table, error) {
 	return wencaiResultTable(condition, dataMap)
 }
 
-// wencaiFieldKey 对应 Python 中的 (int(field.get("index") or 0), str(field.get("timestamp") or ""))。
+// wencaiFieldKey 构造字段的去重键：(index 数值, timestamp 文本)。
 type wencaiFieldKey struct {
 	index     int64
 	timestamp string
 }
 
-// wencaiIdentity 对应 Python _wencai_identity：从问财证券或明细行提取标准证券身份。
+// wencaiIdentity 从问财证券或明细行提取标准证券身份。
 func wencaiIdentity(item any) map[string]string {
 	row, ok := item.(map[string]any)
 	if !ok {
@@ -659,7 +682,7 @@ func wencaiIdentity(item any) map[string]string {
 	return map[string]string{"full_code": fullCode, "code": code, "market": market}
 }
 
-// wencaiIdentityKey 对应 Python _wencai_identity_key。
+// wencaiIdentityKey 构造证券身份的去重键。
 func wencaiIdentityKey(identity map[string]string) *wencaiKey {
 	if fullCode := identity["full_code"]; fullCode != "" {
 		return &wencaiKey{kind: "full_code", first: fullCode}
@@ -676,7 +699,7 @@ type wencaiKey struct {
 	second string
 }
 
-// wencaiResultTable 组装问财查询结果的表格，对应 Python wencai_nlp 后半段。
+// wencaiResultTable 组装问财查询结果的表格。
 func wencaiResultTable(condition string, data map[string]any) (*Table, error) {
 	fieldNames := map[wencaiFieldKey]string{}
 	for _, item := range toSequenceAnyOrEmpty(data["fields"]) {
@@ -832,7 +855,7 @@ func wencaiResultTable(condition string, data map[string]any) (*Table, error) {
 	return table, nil
 }
 
-// toIndex 宽松地把值转为索引整数（对应 Python int(...)）。
+// toIndex 宽松地把值转为索引整数。
 func toWencaiIndex(value any) int64 {
 	if number, ok := asInt64(value); ok {
 		return number
@@ -848,7 +871,7 @@ func toWencaiIndex(value any) int64 {
 	return 0
 }
 
-// NewsOptions 对应 Python news 参数。
+// NewsOptions 控制 News 的查询参数。
 type NewsOptions struct {
 	Page     int    // 默认 1
 	PageSize int    // 默认 20
@@ -856,13 +879,15 @@ type NewsOptions struct {
 }
 
 // News 查询 7x24 快讯；分页信息保存在返回表格的 attrs 中。
+// 入参：opts；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func News(opts ...*NewsOptions) (*Table, error) {
 	page, pageSize, tag := 1, 20, ""
 	for _, item := range opts {
 		if item == nil {
 			continue
 		}
-		// 与 Python 关键字参数一致：显式传入的值无条件生效，由下方校验拦截非法值。
+		// 与 关键字参数一致：显式传入的值无条件生效，由下方校验拦截非法值。
 		page = item.Page
 		pageSize = item.PageSize
 		tag = item.Tag
@@ -895,13 +920,15 @@ func News(opts ...*NewsOptions) (*Table, error) {
 	return table, nil
 }
 
-// MarketSecuritiesOptions 对应 Python market_securities 参数。
+// MarketSecuritiesOptions 控制 MarketSecurities 的查询参数。
 type MarketSecuritiesOptions struct {
 	Start int // 默认 0
 	Count int // 默认 100
 }
 
 // MarketSecurities 按市场列出证券；总数等分页信息保存在返回表格的 attrs 中。
+// 入参：market、opts；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func MarketSecurities(market string, opts ...*MarketSecuritiesOptions) (*Table, error) {
 	start, count := 0, 100
 	for _, item := range opts {
@@ -942,13 +969,15 @@ func MarketSecurities(market string, opts ...*MarketSecuritiesOptions) (*Table, 
 	return table, nil
 }
 
-// BlockConstituentsOptions 对应 Python block_constituents 参数。
+// BlockConstituentsOptions 控制 BlockConstituents 的查询参数。
 type BlockConstituentsOptions struct {
 	Start int // 默认 0
 	Count int // 默认 100
 }
 
 // BlockConstituents 按板块 ID 或名称查询成分证券。
+// 入参：block、opts；语义见函数用途。
+// 出参：*Table（成功时）；error 为调用失败时的错误。
 func BlockConstituents(block any, opts ...*BlockConstituentsOptions) (*Table, error) {
 	start, count := 0, 100
 	for _, item := range opts {
@@ -994,7 +1023,7 @@ func BlockConstituents(block any, opts ...*BlockConstituentsOptions) (*Table, er
 	return frame(identityRows(result), false)
 }
 
-// stringOrEmpty 对应 Python 的 value or ""（缺失时为空串）。
+// stringOrEmpty 返回映射中的字符串值，缺失时为空串。
 func stringOrEmpty(value any) string {
 	if value == nil {
 		return ""

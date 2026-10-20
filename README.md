@@ -1,12 +1,12 @@
 # thsdk-go
 
-`thsdk-go` 是 Python 版 `thsdk`（同花顺 THS 行情/交易 SDK，v2.0.2）的 **Go 逐行直译移植版**，作为全新项目独立交付：
+`thsdk-go` 是同花顺 THS 行情/交易 SDK（v2.0.2）的 **Go 全新独立实现版**，业务逻辑与协议语义逐行对齐：
 
-- **80 个 Canonical 原生方法**全部实现（`List*` / `Get*` 命名，与 Python 包装一一对应）；
-- **63 个 DataFrame Table 包装**（`<方法名>Table`）等价实现 `pandas.DataFrame`；
+- **80 个 Canonical 原生方法**全部实现（`List*` / `Get*` 命名）；
+- **63 个 Table 结果包装**（`<方法名>Table`）返回 `*thsdk.Table`（列/行/索引结构）；
 - **15 个便捷函数**（`GetPrice` / `Klines` / `IntradayData` / `TickLevel1` / `Depth` / `CorporateAction` / `SearchSymbols` / `CompleteTHSCode` / `WencaiNLP` / `News` / `MarketSecurities` / `BlockConstituents` 等）；
 - **三平台运行组件**：macOS（x86_64 / arm64）、Linux（x86_64 / arm64）、Windows（x86_64）；
-- 业务逻辑、常量定义、错误文案与 Python 源码逐行对齐；模块 `Version = "3.0.0"`、ABI `2.0.0`。
+- 业务逻辑、常量定义、错误文案与原始协议逐行对齐；模块 `Version = "3.0.0"`、ABI `2.0.0`。
 
 ## 目录结构
 
@@ -32,9 +32,9 @@ thsdk-go/
 ├── api_news.go              # 14 个快讯方法
 ├── api_wencai.go            # 7 个问财方法
 ├── api_rankings.go          # 11 个排行方法
-├── api_dataframe.go         # 63 个 Table 包装
+├── api_table.go         # 63 个 Table 包装
 ├── api_convenience.go       # 15 个便捷函数 + periods/adjustments/security/date 等助手
-├── table.go                 # Table（pandas.DataFrame 等价实现）
+├── table.go                 # Table（列/行/索引/元数据的表格结果）
 ├── thsdk.go                 # Version / getClient 单例 / SetDefaultClient / Close
 ├── libs/                    # 三平台原生运行组件副本
 ├── examples/                # demo（完整调用示例）/ table / smoke（本机组件握手）
@@ -122,7 +122,7 @@ docker run --rm -v "$PWD":/work -w /work thsdk-verify bash scripts/docker_verify
 
 ## 运行组件
 
-`libs/` 目录布局与 Python 包一致（`libs/<系统>/<架构>/<组件>`）：
+`libs/` 目录布局为发行包约定（`libs/<系统>/<架构>/<组件>`）：
 
 | 系统 | 架构 | 文件 |
 |---|---|---|
@@ -130,7 +130,7 @@ docker run --rm -v "$PWD":/work -w /work thsdk-verify bash scripts/docker_verify
 | linux | amd64 / arm64 | `hq.so` |
 | windows | amd64 | `hq.dll` |
 
-查找顺序（对应 Python `_resolve_component`）：`THSDK_RUNTIME_PATH` 环境变量
+查找顺序：`THSDK_RUNTIME_PATH` 环境变量
 优先；其次可执行文件目录 / 当前工作目录 / 本仓库源码目录下的 `libs/...`。
 
 ## 快速开始
@@ -203,17 +203,17 @@ table, err := thsdk.ListSecurityKLinesTable(map[string]any{
 }, thsdk.WithTimeout(30))
 ```
 
-## 与 Python 版的差异说明
+## 与原版实现的差异说明
 
-| 项 | Python | Go |
+| 项 | 原版 | Go |
 |---|---|---|
-| DataFrame | `pandas.DataFrame` | `*thsdk.Table`（`Columns`/`Rows`/`Index`/`IndexName`/`Attrs`） |
+| 表格结果 | 二维表结构 | `*thsdk.Table`（`Columns`/`Rows`/`Index`/`IndexName`/`Attrs`） |
 | 关键字参数 | 命名参数 | `*Options` 结构体 + 默认值 |
-| JSON 数字 | `json.loads` 自动 int/float | `json.Number` → 整数 `int64`、小数 `float64` |
-| 原生调用 | ctypes | cgo 专用线程桥（默认）；purego 回退（`CGO_ENABLED=0`） |
+| JSON 数字 | 自动 int/float | `json.Number` → 整数 `int64`、小数 `float64` |
+| 原生调用 | 动态库 FFI | cgo 专用线程桥（默认）；purego 回退（`CGO_ENABLED=0`） |
 | 单例 | 模块级全局客户端 | `getClient()` + `SetDefaultClient` |
-| 列顺序 | dict 插入序 | 记录内按字典序（Go map 无序，保证确定性） |
-| 语义保留 | — | 数据校验、错误文案、常量值、周期/复权映射与 Python 完全一致 |
+| 列顺序 | 记录键序 | 记录内按字典序（Go map 无序，保证确定性） |
+| 语义保留 | — | 数据校验、错误文案、常量值、周期/复权映射与原始协议完全一致 |
 
 ## 许可证与声明
 

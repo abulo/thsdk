@@ -1,4 +1,4 @@
-// 命令 table-demo 演示 *Table（pandas.DataFrame 等价实现）的
+// 命令 table-demo 演示表格类型 *Table 的
 // 构建、选列、设索引与 JSON 序列化，不需要运行组件参与。
 package main
 
